@@ -181,6 +181,16 @@ class Library {
         return true;
     }
 
+    async getScreenshot(path, filename, user, pass) {
+        const form = new FormData();
+        form.append('username', user);
+        form.append('password', pass);
+        form.append('path', path);
+        form.append('filename', filename);
+        await this.client.getScreenshot(form);
+        return true;
+    }
+
     async setDelay(delay) {
         await this.client.setTimeouts("pressDelay", delay);
         return true;

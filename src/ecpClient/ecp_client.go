@@ -191,6 +191,28 @@ func (ec *PluginClient) makePluginRequest(method string, end string, body []byte
 
 	return true, nil
 }
+
+//TODO review if it makes sense to merge with makePluginRequest
+func (ec *PluginClient) makePluginRequestResponse(method string, end string, body []byte, headers map[string]string) (bool, *http.Response, error) {
+	res, err := url.Parse(end)
+	if err != nil {
+		return false, nil, err
+	}
+	requestObject := &RequestData{
+		Method:      method,
+		Endpoint:    res,
+		RequestBody: bytes.NewBuffer(body),
+		HeadersMap:  headers,
+	}
+	response, err := ec.makeRequest(requestObject)
+	if err != nil {
+		return false, nil, err
+	} else if response.StatusCode != successStatusCode {
+		return false, nil, errors.New("Command execution failed")
+	}
+	return true, response, nil
+}
+
 func (ec *PluginClient) getAuthHeader(uri string, user string, pass string)  (string, error) {
 	method := "POST"
 	res,_ := url.Parse(uri)
@@ -209,6 +231,26 @@ func (ec *PluginClient) getAuthHeader(uri string, user string, pass string)  (st
     digestParts["password"] = pass
     authHeader := getDigestAuthrization(digestParts)
     return authHeader, nil
+}
+
+//TODO review if it makes sense to merge with getAuthHeader
+func (ec *PluginClient) getAuthHeaderMethod(method string, uri string, user string, pass string) (string, error) {
+	res, _ := url.Parse(uri)
+	requestObject := &RequestData{
+		Method:   method,
+		Endpoint: res,
+	}
+	response, err := ec.makeRequest(requestObject)
+	if err != nil {
+		return "", err
+	}
+	digestParts := digestParts(response)
+	digestParts["uri"] = uri
+	digestParts["method"] = method
+	digestParts["username"] = user
+	digestParts["password"] = pass
+	authHeader := getDigestAuthrization(digestParts)
+	return authHeader, nil
 }
 
 func digestParts(resp *http.Response) map[string]string {
@@ -256,6 +298,8 @@ func (ec *BaseClient) call(req *http.Request) (*http.Response, error) {
 	retries := requestRetries
 	var resp *http.Response
 	var err error
+	// force connection close to avoid empty body responses which result in failures
+	req.Close = true
 	for retries > 0 {
         resp, err = ec.HttpClient.HttpClient.Do(req)
         if err != nil {
@@ -394,6 +438,98 @@ func (ec *EcpClient) LaunchChannel(channelId string, contentId  string , mediaTy
 	}
 
 	return ec.makeNavigationRequest("POST", end)
+}
+
+//TODO write tests
+func (ec *PluginClient) GetScreenshotUrl(user string, pass string) (string, error) {
+	end := endpointsMap["inspect"]
+	auth, err := ec.getAuthHeader(end, user, pass)
+	if err != nil {
+		return "", err
+	}
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	writer.WriteField("mysubmit", "Screenshot")
+	writer.WriteField("archive", "")
+	writer.Close()
+	headers := map[string]string{
+		"Authorization": auth,
+		"Content-Type":  "multipart/form-data",
+	}
+
+	_, response, err := ec.makePluginRequestResponse("POST", end, body.Bytes(), headers)
+	if err != nil {
+		return "", err
+	}
+
+	responseBody, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+
+	data := string(responseBody)
+	contains := strings.Contains(data, "pkgs/dev.")
+
+	//TODO review condition
+	if contains != true {
+		return "", errors.New("screenshot url not found")
+	}
+	//TODO review condition
+	reg := regexp.MustCompile(`<img src="(.*)">`)
+	match := reg.FindStringSubmatch(data)
+	imgUrl := match[1]
+
+	return imgUrl, nil
+}
+func (ec *PluginClient) GetScreenshot(user string, pass string, imgUrl string, path string, filename string) (bool, error) {
+	method := "GET"
+	end, err := url.Parse(imgUrl)
+	if err != nil {
+		return false, err
+	}
+
+	auth, err := ec.getAuthHeaderMethod(method, imgUrl, user, pass)
+	if err != nil {
+		return false, err
+	}
+
+	headers := map[string]string{
+		"Authorization": auth,
+		"Accept":        "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+	}
+
+	requestObject := &RequestData{
+		Method:     method,
+		Endpoint:   end,
+		HeadersMap: headers,
+	}
+
+	res, err := ec.makeRequest(requestObject)
+	if err != nil {
+		return false, err
+	}
+
+	//TODO review if it makes sense to keep prefix
+	reg := regexp.MustCompile(`time=(.*)`)
+	match := reg.FindStringSubmatch(imgUrl)
+	prefix := match[1]
+	filename = prefix + "_" + filename
+
+	fmt.Println(path + filename)
+
+	file, err := os.Create(path + filename)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, res.Body)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 func (ec *EcpClient) InputChannel(channelId string, contentId  string , mediaType string ) (bool, error) {

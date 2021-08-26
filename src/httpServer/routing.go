@@ -15,7 +15,7 @@
 
 package httpServer
 
-import(
+import (
 	"net/http"
 )
 
@@ -128,6 +128,11 @@ func (s *Server) SetUpRoutes() {
 			"POST",
 			"/v1/session/{sessionId}/install",
 			s.GetInstallHandler(),
+		},
+		Route{
+			"POST",
+			"/v1/session/{sessionId}/screenshot",
+			s.GetScreenshotHandler(),
 		},
 	}
 		

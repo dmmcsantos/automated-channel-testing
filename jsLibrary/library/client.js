@@ -90,6 +90,10 @@ class Client {
         return await this.doRequest('/element', 'post', data);
     }
 
+    async getScreenshot(form) {
+        return await this.doRequest('/screenshot', 'post', form, form.getHeaders());
+    }
+
     async sideLoadChannel(form) {
         console.log
         return await this.doRequest('/load', 'post', form, form.getHeaders());

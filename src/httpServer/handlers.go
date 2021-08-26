@@ -254,6 +254,52 @@ func (s *Server) GetTimeoutsHandler() appHandler {
     }
  }
 
+ // TODO write tests
+ func (s *Server) GetScreenshotHandler() appHandler {
+	return func(w http.ResponseWriter, r *http.Request) *appError {
+		plugin, id, errorInfo := s.getPlugin(r)
+		if errorInfo != nil {
+			return errorInfo
+		}
+		r.ParseMultipartForm(4096)
+		user := r.FormValue("username")
+		if user == "" {
+			return &appError{"The \"username\" field is required ", http.StatusBadRequest, nil}
+		}
+		pass := r.FormValue("password")
+		if pass == "" {
+			return &appError{"The \"password\" field is required ", http.StatusBadRequest, nil}
+		}
+
+		path := r.FormValue("path")
+		if path == "" {
+			return &appError{"The \"path\" field is required ", http.StatusBadRequest, nil}
+		}
+
+		filename := r.FormValue("filename")
+		if filename == "" {
+			return &appError{"The \"filename\" field is required ", http.StatusBadRequest, nil}
+		}
+
+		url, err := plugin.GetScreenshotUrl(user, pass)
+		if err != nil || url == "" {
+			status := responseStatuses["Unable to get screenshot url"]
+			return &appError{err.Error(), http.StatusInternalServerError, &status}
+		}
+
+		res, err := plugin.GetScreenshot(user, pass, url, path, filename)
+		if err != nil || res == false {
+			status := responseStatuses["Unable to download screenshot"]
+			return &appError{err.Error(), http.StatusInternalServerError, &status}
+		}
+		return prepareResponse(w, &SessionResponse{
+			Id:     id,
+			Status: 0,
+			Value:  nil,
+		})
+	}
+}
+
  func (s *Server) GetImplicitTimeoutHandler() appHandler {
 	return func(w http.ResponseWriter, r *http.Request) *appError {
         client, id, errorInfo := s.getClient(r)
