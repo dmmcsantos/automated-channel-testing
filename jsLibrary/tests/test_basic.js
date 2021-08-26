@@ -33,19 +33,18 @@ describe('test_basic', () => {
         await library.verifyIsChannelLoaded('dev');
     });
 
-    it('take screenshot after launching the channel', async function() { 
-        this.timeout(30000);
-        const path = "../sample/"
-        const filename = "screenshot.jpg"
-        await library.verifyIsChannelLoaded('dev');
-        await library.getScreenshot(path, filename, "rokudev", "rokudev")
-    });
-
     it('Check if details screen showed', async function() { 
         this.timeout(30000);
         await library.sendKey('select', 4);
         const res = await library.verifyIsScreenLoaded({'elementData': [{'using': 'text', 'value': 'Barack Gates, Bill Obama'}]});
         expect(res).to.equal(true);
+    });
+
+    it('take screenshot from details screen', async function() { 
+        this.timeout(15000);
+        const path = "../sample/";
+        const filename = "screenshot.jpg";
+        await library.getScreenshot(path, filename, "rokudev", "aaaa");
     });
     
     it('Check if playback started', async function() { 

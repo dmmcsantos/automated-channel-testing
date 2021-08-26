@@ -29,6 +29,9 @@ import (
     "crypto/rand"
     "encoding/hex"
 	"strings"
+	"io/ioutil"
+	"regexp"
+	"os"
 )
 
 const RequestTimeoutMilliseconds = 30000
@@ -51,6 +54,7 @@ var endpointsMap = map[string]string{
 	"player":    "query/media-player",
 	"input":     "input/%s?contentId=%s&mediaType=%s",
 	"load":      "/plugin_install",
+	"inspect":   "/plugin_inspect",
 }
 
 type BaseClient struct {
@@ -515,9 +519,7 @@ func (ec *PluginClient) GetScreenshot(user string, pass string, imgUrl string, p
 	match := reg.FindStringSubmatch(imgUrl)
 	prefix := match[1]
 	filename = prefix + "_" + filename
-
-	fmt.Println(path + filename)
-
+	
 	file, err := os.Create(path + filename)
 	if err != nil {
 		return false, err
